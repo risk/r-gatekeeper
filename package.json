@@ -1,6 +1,6 @@
 {
   "name": "r-gatekeeper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Type-safe input/output gates for your handlers, powered by Zod.",
   "main": "dist/index.js",
