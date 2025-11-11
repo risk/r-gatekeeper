@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - 'coverage/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE/**'
+  pull_request:
+    types: [ opened, synchronize, reopened, ready_for_review ]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - 'coverage/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE/**'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Run on PRs always. On push, skip merge-commits from PRs to avoid duplicate runs
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, 'Merge pull request'))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check build output
+        run: |
+          ls -la dist/
+          node -e "console.log('Build successful!')"
+
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !contains(github.event.head_commit.message, 'Merge pull request'))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build
+        run: |
+          ls -la dist/
+          node -e "const pkg = require('./dist/index.js'); console.log('Build verification successful!')"
