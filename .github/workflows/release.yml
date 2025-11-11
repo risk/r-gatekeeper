@@ -59,7 +59,7 @@ jobs:
             echo "## Installation";
             echo "";
             echo '```bash';
-            echo "npm install r-pipeline@${TAG_NAME}";
+            echo "npm install r-gatekeeper@${TAG_NAME}";
             echo '```';
           } >> release_body.txt
           gh release edit "$TAG_NAME" --notes-file release_body.txt
