@@ -16,45 +16,36 @@ import { GateSchemaType, GateSchemas } from './types'
 export type GateHandlerInput<IN_SCHEMA extends GateSchemaType> = z.infer<IN_SCHEMA>
 
 /**
- * Result type of a sync gate handler.
+ * Value returned by a gate handler before output validation.
  *
- * The handler:
- * - Returns `z.infer<OUT_SCHEMA>` on success.
- * - Or returns an {@link Error} to signal a handler-level failure.
- *
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
+ * Data coming back from outside the gate is untyped. `schemas.out` is what
+ * stabilizes this value into `z.infer<OUT_SCHEMA>`.
+ * An {@link Error} is intercepted as a handler-level failure and is not
+ * passed to the output schema.
  */
-export type GateHandlerResult<OUT_SCHEMA extends GateSchemaType> = z.infer<OUT_SCHEMA> | Error
+export type GateHandlerResult = unknown
 
 /**
- * Result type of an async-capable gate handler.
+ * Value returned by an async-capable gate handler before output validation.
  *
- * The handler may:
- * - Return `GateHandlerResult<OUT_SCHEMA>` directly.
- * - Or a `Promise` that resolves to `GateHandlerResult<OUT_SCHEMA>`.
- *
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
+ * The handler may return {@link GateHandlerResult} directly, or a `Promise`
+ * that resolves to it. `unknown` already includes both.
  */
-export type GateHandlerAsyncResult<OUT_SCHEMA extends GateSchemaType> =
-  | GateHandlerResult<OUT_SCHEMA>
-  | Promise<GateHandlerResult<OUT_SCHEMA>>
+export type GateHandlerAsyncResult = GateHandlerResult | Promise<GateHandlerResult>
 
 /**
  * Signature of a sync gate handler.
  *
  * @typeParam IN_SCHEMA - Zod schema type for the handler input.
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
  * @param input - Validated input value inferred from `IN_SCHEMA`.
  */
-export type GateHandler<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType> = (
-  input: GateHandlerInput<IN_SCHEMA>
-) => GateHandlerResult<OUT_SCHEMA>
+export type GateHandler<IN_SCHEMA extends GateSchemaType> = (input: GateHandlerInput<IN_SCHEMA>) => GateHandlerResult
 
 /**
  * Helper type to derive a sync handler signature from a pair of gate schemas.
  *
  * - The handler receives `z.infer<SCHEMAS['in']>` as input.
- * - The handler must return either `z.infer<SCHEMAS['out']>` or an {@link Error}.
+ * - The handler returns {@link GateHandlerResult}. `SCHEMAS['out']` validates that return at the gate.
  *
  * This is mainly used in tests or advanced usage where you need to align a handler type
  * with a given {@link GateSchemas} object.
@@ -62,35 +53,29 @@ export type GateHandler<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends Gat
  * @typeParam SCHEMAS - A pair of input/output Zod schemas.
  */
 export type GateHandlerFromSchemas<SCHEMAS extends GateSchemas<GateSchemaType, GateSchemaType>> = GateHandler<
-  SCHEMAS['in'],
-  SCHEMAS['out']
+  SCHEMAS['in']
 >
 
 /**
  * Signature of an async-capable gate handler.
  *
- * The handler may be:
- * - Purely sync (returning `GateHandlerResult<OUT_SCHEMA>`), or
- * - Async (returning `Promise<GateHandlerResult<OUT_SCHEMA>>`).
+ * The handler may be sync or async. Its return is {@link GateHandlerAsyncResult}.
  *
  * @typeParam IN_SCHEMA - Zod schema type for the handler input.
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
  * @param input - Validated input value inferred from `IN_SCHEMA`.
  */
-export type GateHandlerAsync<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType> = (
+export type GateHandlerAsync<IN_SCHEMA extends GateSchemaType> = (
   input: GateHandlerInput<IN_SCHEMA>
-) => GateHandlerAsyncResult<OUT_SCHEMA>
+) => GateHandlerAsyncResult
 
 /**
  * Helper type to derive an async-capable handler signature from a pair of gate schemas.
  *
  * - The handler receives `z.infer<SCHEMAS['in']>` as input.
- * - The handler may return the output or an {@link Error} directly,
- *   or a `Promise` that resolves to either.
+ * - The handler returns {@link GateHandlerAsyncResult}. `SCHEMAS['out']` validates that return at the gate.
  *
  * @typeParam SCHEMAS - A pair of input/output Zod schemas.
  */
 export type GateHandlerAsyncFromSchemas<SCHEMAS extends GateSchemas<GateSchemaType, GateSchemaType>> = GateHandlerAsync<
-  SCHEMAS['in'],
-  SCHEMAS['out']
+  SCHEMAS['in']
 >

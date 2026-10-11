@@ -6,6 +6,7 @@
 
 import type { z } from 'zod'
 
+import { GateHandler, GateHandlerAsync } from './typeHelper'
 import { GateResult, GateSchemas, GateSchemaType } from './types'
 
 function gateOk<RET>(data: RET) {
@@ -52,7 +53,7 @@ function gateHandlerError(error: Error) {
  */
 function gateWrapHandler<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType, WRAP_IN>(
   schemas: GateSchemas<IN_SCHEMA, OUT_SCHEMA>,
-  handler: (input: z.infer<IN_SCHEMA>) => z.infer<OUT_SCHEMA> | Error
+  handler: GateHandler<IN_SCHEMA>
 ) {
   return (input: WRAP_IN): GateResult<z.infer<OUT_SCHEMA>> => {
     const parsedInput = schemas.in.safeParse(input)
@@ -77,17 +78,18 @@ function gateWrapHandler<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends Ga
  * - The returned function accepts `unknown` as input.
  * - Input is validated by `schemas.in.safeParse`.
  * - Output is validated by `schemas.out.safeParse`.
- * - If validation passes, the handler is called with a typed input.
+ * - If input validation passes, the handler is called with a typed input.
+ * - The handler returns `unknown`. `schemas.out` is what stabilizes that return.
  *
  * Use this when you are at an outer boundary (e.g. HTTP handler, message queue, etc.)
  * and want the gate to accept untyped data and guard it with Zod.
  *
  * @typeParam IN_SCHEMA - Zod schema type for the handler input.
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
+ * @typeParam OUT_SCHEMA - Zod schema type for the gate output.
  * @param schemas.in - Zod schema used to validate the input.
- * @param schemas.out - Zod schema used to validate the output.
+ * @param schemas.out - Zod schema used to validate the handler return.
  * @param handler - Business logic that runs with a validated input.
- *   - Return a value matching `schemas.out` on success.
+ *   - Return `unknown`. The gate validates it with `schemas.out`.
  *   - Return an `Error` to propagate a handler-level failure.
  * @returns A function that:
  *   - Validates input/output using Zod.
@@ -95,7 +97,7 @@ function gateWrapHandler<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends Ga
  */
 export function withGate<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType>(
   schemas: GateSchemas<IN_SCHEMA, OUT_SCHEMA>,
-  handler: (input: z.infer<IN_SCHEMA>) => z.infer<OUT_SCHEMA> | Error
+  handler: GateHandler<IN_SCHEMA>
 ) {
   return gateWrapHandler<IN_SCHEMA, OUT_SCHEMA, unknown>(schemas, handler)
 }
@@ -110,11 +112,11 @@ export function withGate<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends Ga
  * - Internally the handler still receives `z.infer<IN_SCHEMA>`.
  *
  * @typeParam IN_SCHEMA - Zod schema type for the handler input.
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
+ * @typeParam OUT_SCHEMA - Zod schema type for the gate output.
  * @param schemas.in - Zod schema used to validate the input.
- * @param schemas.out - Zod schema used to validate the output.
+ * @param schemas.out - Zod schema used to validate the handler return.
  * @param handler - Business logic that runs with a validated input.
- *   - Return a value matching `schemas.out` on success.
+ *   - Return `unknown`. The gate validates it with `schemas.out`.
  *   - Return an `Error` to propagate a handler-level failure.
  * @returns A function that:
  *   - Validates input/output using Zod.
@@ -122,7 +124,7 @@ export function withGate<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends Ga
  */
 export function withGateFixedIn<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType>(
   schemas: GateSchemas<IN_SCHEMA, OUT_SCHEMA>,
-  handler: (input: z.infer<IN_SCHEMA>) => z.infer<OUT_SCHEMA> | Error
+  handler: GateHandler<IN_SCHEMA>
 ) {
   return gateWrapHandler<IN_SCHEMA, OUT_SCHEMA, z.input<IN_SCHEMA>>(schemas, handler)
 }
@@ -136,7 +138,7 @@ export function withGateFixedIn<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA ext
  */
 function gateWrapHandlerAsync<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType, WRAP_IN>(
   schemas: GateSchemas<IN_SCHEMA, OUT_SCHEMA>,
-  handler: (input: z.infer<IN_SCHEMA>) => z.infer<OUT_SCHEMA> | Error | Promise<z.infer<OUT_SCHEMA> | Error>
+  handler: GateHandlerAsync<IN_SCHEMA>
 ) {
   return async (input: WRAP_IN): Promise<GateResult<z.infer<OUT_SCHEMA>>> => {
     const parsedInput = await schemas.in.safeParseAsync(input)
@@ -164,19 +166,20 @@ function gateWrapHandlerAsync<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA exten
  * Use this when your handler performs async work (e.g. database, HTTP calls).
  *
  * @typeParam IN_SCHEMA - Zod schema type for the handler input.
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
+ * @typeParam OUT_SCHEMA - Zod schema type for the gate output.
  * @param schemas.in - Zod schema used to validate the input.
- * @param schemas.out - Zod schema used to validate the output.
+ * @param schemas.out - Zod schema used to validate the handler return.
  * @param handler - Business logic that runs with a validated input.
- *   - May return the output value or an `Error` directly.
- *   - Or a `Promise` that resolves to a value or an `Error`.
+ *   - May return `unknown` or an `Error` directly.
+ *   - Or a `Promise` that resolves to either.
+ *   - The gate validates a non-error return with `schemas.out`.
  * @returns An async function that:
  *   - Validates input/output using Zod.
  *   - Resolves to a `GateResult` with either validated data or a typed error.
  */
 export function withGateAsync<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType>(
   schemas: GateSchemas<IN_SCHEMA, OUT_SCHEMA>,
-  handler: (input: z.infer<IN_SCHEMA>) => z.infer<OUT_SCHEMA> | Error | Promise<z.infer<OUT_SCHEMA> | Error>
+  handler: GateHandlerAsync<IN_SCHEMA>
 ) {
   return gateWrapHandlerAsync<IN_SCHEMA, OUT_SCHEMA, unknown>(schemas, handler)
 }
@@ -189,19 +192,20 @@ export function withGateAsync<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA exten
  * - Supports both sync and async handlers.
  *
  * @typeParam IN_SCHEMA - Zod schema type for the handler input.
- * @typeParam OUT_SCHEMA - Zod schema type for the handler output.
+ * @typeParam OUT_SCHEMA - Zod schema type for the gate output.
  * @param schemas.in - Zod schema used to validate the input.
- * @param schemas.out - Zod schema used to validate the output.
+ * @param schemas.out - Zod schema used to validate the handler return.
  * @param handler - Business logic that runs with a validated input.
- *   - May return the output value or an `Error` directly.
- *   - Or a `Promise` that resolves to a value or an `Error`.
+ *   - May return `unknown` or an `Error` directly.
+ *   - Or a `Promise` that resolves to either.
+ *   - The gate validates a non-error return with `schemas.out`.
  * @returns An async function that:
  *   - Validates input/output using Zod.
  *   - Resolves to a `GateResult` with either validated data or a typed error.
  */
 export function withGateFixedInAsync<IN_SCHEMA extends GateSchemaType, OUT_SCHEMA extends GateSchemaType>(
   schemas: GateSchemas<IN_SCHEMA, OUT_SCHEMA>,
-  handler: (input: z.infer<IN_SCHEMA>) => z.infer<OUT_SCHEMA> | Error | Promise<z.infer<OUT_SCHEMA> | Error>
+  handler: GateHandlerAsync<IN_SCHEMA>
 ) {
   return gateWrapHandlerAsync<IN_SCHEMA, OUT_SCHEMA, z.input<IN_SCHEMA>>(schemas, handler)
 }
