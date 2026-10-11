@@ -6,7 +6,7 @@ Type-safe input/output gates around your handlers, powered by [Zod](https://gith
 
 - 🚫 **No unexpected data comes in** – inputs are validated before your handler runs.
 - 🚫 **No unexpected data leaks out** – outputs are validated before they leave the gate.
-- ✅ **Your handler only deals with validated data**.
+- ✅ **Your handler receives validated input**. What it returns stays untyped until the output schema accepts it.
 - ✅ **Errors are normalized** as a small discriminated union (`GateResult`).
 
 It is intentionally small and focused: no DI container、no framework、just gates.
@@ -31,8 +31,8 @@ r-gatekeeper is built around three ideas:
 1. **Schemas at the boundary**  
    You describe the input/output of a handler with Zod schemas.
 
-2. **Handlers work on validated data**  
-   Handlers never see `unknown`. They receive `z.infer<IN>` and must return `z.infer<OUT>` (or an `Error`).
+2. **Handlers receive validated input and return untyped data**  
+   Handlers receive `z.infer<IN>`. Their return is `unknown`, because data coming back from outside is not trusted. `schemas.out` is what stabilizes that return into `z.infer<OUT>`. Returning an `Error` is a handler-level failure and is not passed to the output schema.
 
 3. **Uniform result shape**  
    Gates always return a `GateResult<T>`:
@@ -130,7 +130,7 @@ const result = gate({ value: 2 }) // value: unknown
 - Input type: `unknown`  
   → validated by `schemas.in.safeParse`
 - Handler input: `z.infer<typeof schemas.in>`
-- Handler output: `z.infer<typeof schemas.out> | Error`
+- Handler return: `unknown` (an `Error` is taken as a handler failure before output validation)
 - Output type: `GateResult<z.infer<typeof schemas.out>>`
 
 Use this at **outer boundaries** where raw data flows in (HTTP, queues, CLIs, etc.).
@@ -179,7 +179,7 @@ const result = await gate({ id: '123' })
 ```
 
 - `withGateAsync` – same as `withGate`, but:
-  - Handler may return a value or `Error`, or a `Promise` of either.
+  - Handler may return `unknown` or `Error`, or a `Promise` of either.
   - Uses `safeParseAsync` for input/output.
 - `withGateFixedInAsync` – async version of `withGateFixedIn`.
 

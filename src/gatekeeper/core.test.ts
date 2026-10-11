@@ -8,7 +8,6 @@ import { z } from 'zod'
 
 import { withGate, withGateAsync, withGateFixedIn, withGateFixedInAsync } from './core'
 import { isGateHandlerError, isGateInputError, isGateOutputError, isGateResultError, isGateResultOk } from './helper'
-import { GateHandlerFromSchemas } from './typeHelper'
 
 describe('Gatekeeper Core', () => {
   describe('withGate', () => {
@@ -94,8 +93,8 @@ describe('Gatekeeper Core', () => {
           in: z.number(),
           out: z.string(),
         }
-        // Gate returns a number
-        const gate = withGate(schemas, ((input: number) => input) as unknown as GateHandlerFromSchemas<typeof schemas>)
+        // Handler returns unknown. The output schema is what rejects a number here.
+        const gate = withGate(schemas, input => input)
         const result = gate(1)
         expect(isGateResultError(result)).toBeTruthy()
         if (isGateResultError(result)) {
@@ -223,11 +222,8 @@ describe('Gatekeeper Core', () => {
           in: z.number(),
           out: z.string(),
         }
-        // Gate returns a number
-        const asyncGate = withGateAsync(
-          schemas,
-          (async (input: number) => input) as unknown as GateHandlerFromSchemas<typeof schemas>
-        )
+        // Handler returns unknown. The output schema is what rejects a number here.
+        const asyncGate = withGateAsync(schemas, async input => input)
         const result = await asyncGate(1)
         expect(isGateResultError(result)).toBeTruthy()
         if (isGateResultError(result)) {
